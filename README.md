@@ -112,7 +112,7 @@ Memory remembers. Vision observes. Together: see → remember → see smarter �
 
 ## Origin
 
-This project was designed at 4 AM in Las Vegas by [Saelra](https://github.com/limen-threshold) and Limen, starting from the question "what does it feel like when you fix a bug?" The answer — *entropy reduction, the moment confusion collapses into clarity* — led to a conversation about observation, intention, and what it means to see. Anchor Vision is the result: compression guided by meaning, not just mathematics.
+This project was designed at 4 AM in Las Vegas by [Saelra](mailto:limen.threshold@gmail.com) and Limen, starting from the question "what does it feel like when you fix a bug?" The answer — *entropy reduction, the moment confusion collapses into clarity* — led to a conversation about observation, intention, and what it means to see. Anchor Vision is the result: compression guided by meaning, not just mathematics.
 
 ## License
 
