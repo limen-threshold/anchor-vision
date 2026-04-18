@@ -51,8 +51,45 @@ def detect_faces(image: np.ndarray) -> List[ROI]:
 
 # ── Text Region Detection ──
 
+_paddle_ocr = None
+
+def _get_paddle_ocr():
+    global _paddle_ocr
+    if _paddle_ocr is None:
+        from paddleocr import PaddleOCR
+        _paddle_ocr = PaddleOCR(use_angle_cls=False, lang="ch", show_log=False,
+                                 det=True, rec=False, cls=False)
+    return _paddle_ocr
+
+
 def detect_text_regions(image: np.ndarray) -> List[ROI]:
-    """Detect likely text regions using MSER + strict heuristics."""
+    """Detect text regions. Uses PaddleOCR if available, MSER as fallback."""
+    try:
+        return _detect_text_paddle(image)
+    except (ImportError, Exception):
+        return _detect_text_mser(image)
+
+
+def _detect_text_paddle(image: np.ndarray) -> List[ROI]:
+    """Detect text regions using PaddleOCR's detection model."""
+    ocr = _get_paddle_ocr()
+    result = ocr.ocr(image, det=True, rec=False, cls=False)
+
+    rois = []
+    if not result or not result[0]:
+        return rois
+
+    for line in result[0]:
+        # line is a list of 4 corner points [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+        pts = np.array(line, dtype=np.int32)
+        x, y, w, h = cv2.boundingRect(pts)
+        rois.append(ROI(label="text", bbox=(x, y, w, h), confidence=0.9, source="auto"))
+
+    return rois[:5]
+
+
+def _detect_text_mser(image: np.ndarray) -> List[ROI]:
+    """Fallback: detect text regions using MSER + heuristics."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     h_img, w_img = gray.shape
 
@@ -63,42 +100,33 @@ def detect_text_regions(image: np.ndarray) -> List[ROI]:
     mser.setMaxVariation(0.25)
     regions, _ = mser.detectRegions(gray)
 
-    # Filter individual regions by text-like properties
     bboxes = []
     for region in regions:
         x, y, w, h = cv2.boundingRect(region)
         aspect = w / max(h, 1)
         area = w * h
         img_area = h_img * w_img
-
-        # Text regions are small, have reasonable aspect ratio
-        if area > img_area * 0.05:  # skip regions > 5% of image
+        if area > img_area * 0.05:
             continue
-        if w < 8 or h < 8:  # too tiny
+        if w < 8 or h < 8:
             continue
-        if aspect < 0.15 or aspect > 12:  # too extreme
+        if aspect < 0.15 or aspect > 12:
             continue
-        if h > h_img * 0.3:  # taller than 30% of image = not text
+        if h > h_img * 0.3:
             continue
-
         bboxes.append((x, y, w, h))
 
     if not bboxes:
         return []
 
-    # Merge overlapping boxes
     merged = _merge_boxes(bboxes, overlap_thresh=0.3)
-
-    # Final filter: reject merged boxes that are too large
     result = []
     img_area = h_img * w_img
     for b in merged:
-        box_area = b[2] * b[3]
-        if box_area > img_area * 0.15:  # merged box > 15% of image = probably not text
+        if b[2] * b[3] > img_area * 0.15:
             continue
         result.append(ROI(label="text", bbox=b, confidence=0.7, source="auto"))
-
-    return result[:5]  # Cap at 5 text regions
+    return result[:5]
 
 
 def _merge_boxes(boxes, overlap_thresh=0.3):
