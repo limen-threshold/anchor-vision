@@ -42,10 +42,47 @@ def _get_face_cascade():
 
 
 def detect_faces(image: np.ndarray) -> List[ROI]:
-    """Detect faces using OpenCV Haar cascade."""
+    """Detect faces using OpenCV DNN (more robust than Haar cascade)."""
+    try:
+        return _detect_faces_dnn(image)
+    except Exception:
+        return _detect_faces_haar(image)
+
+
+def _detect_faces_dnn(image: np.ndarray) -> List[ROI]:
+    """DNN-based face detection (Caffe model, ships with OpenCV)."""
+    import os
+    model_dir = os.path.join(os.path.dirname(__file__), "models")
+    prototxt = os.path.join(model_dir, "deploy.prototxt")
+    caffemodel = os.path.join(model_dir, "res10_300x300_ssd_iter_140000.caffemodel")
+
+    if not os.path.exists(prototxt):
+        # Fall back to Haar if DNN model not downloaded
+        return _detect_faces_haar(image)
+
+    net = cv2.dnn.readNetFromCaffe(prototxt, caffemodel)
+    h, w = image.shape[:2]
+    blob = cv2.dnn.blobFromImage(image, 1.0, (300, 300), (104.0, 177.0, 123.0))
+    net.setInput(blob)
+    detections = net.forward()
+
+    rois = []
+    for i in range(detections.shape[2]):
+        confidence = detections[0, 0, i, 2]
+        if confidence > 0.5:
+            box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+            x1, y1, x2, y2 = box.astype(int)
+            rois.append(ROI(label="face", bbox=(x1, y1, x2 - x1, y2 - y1),
+                          confidence=float(confidence), source="auto"))
+    return rois
+
+
+def _detect_faces_haar(image: np.ndarray) -> List[ROI]:
+    """Fallback: Haar cascade face detection."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     cascade = _get_face_cascade()
-    faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    # More sensitive settings
+    faces = cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=3, minSize=(20, 20))
     return [ROI(label="face", bbox=tuple(f), source="auto") for f in faces]
 
 

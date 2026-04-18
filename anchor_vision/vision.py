@@ -113,14 +113,26 @@ class AnchorVision:
         # Parse intention into ROIs
         intention_rois = self._parse_intention(intention, image, detection) if intention else []
 
-        # Deduplicate: if intention matched an existing detection ROI, don't double-count
-        seen_bboxes = set()
-        deduped_rois = []
-        for roi in intention_rois + list(detection.rois):
-            key = tuple(int(v) for v in roi.bbox)
-            if key not in seen_bboxes:
-                seen_bboxes.add(key)
-                deduped_rois.append(roi)
+        # Deduplicate: intention ROIs take priority. If an intention ROI is a
+        # sub-region of a detection ROI (e.g. eyes inside face), skip the larger one.
+        deduped_rois = list(intention_rois)
+        for det_roi in detection.rois:
+            det_box = tuple(int(v) for v in det_roi.bbox)
+            # Check if any intention ROI is inside this detection ROI
+            dominated = False
+            for int_roi in intention_rois:
+                int_box = tuple(int(v) for v in int_roi.bbox)
+                # intention ROI is inside detection ROI if they share the same x and
+                # the intention ROI is smaller
+                if (abs(int_box[0] - det_box[0]) < 20 and
+                    abs(int_box[1] - det_box[1]) < 20 and
+                    int_box[2] * int_box[3] < det_box[2] * det_box[3]):
+                    dominated = True
+                    break
+            if not dominated:
+                # Also skip exact duplicates
+                if det_box not in {tuple(int(v) for v in r.bbox) for r in deduped_rois}:
+                    deduped_rois.append(det_roi)
 
         all_rois = deduped_rois
         if not all_rois:
@@ -271,9 +283,18 @@ class AnchorVision:
         rois = []
 
         # Face-related intentions
-        face_keywords = ["face", "expression", "crying", "eyes", "makeup",
-                         "脸", "表情", "哭", "眼", "妆", "状态"]
-        if any(k in intention_lower for k in face_keywords):
+        face_keywords = ["face", "expression", "makeup", "脸", "表情", "妆", "状态"]
+        eye_keywords = ["crying", "tears", "eyes", "哭", "眼泪", "眼睛", "眼"]
+
+        if any(k in intention_lower for k in eye_keywords):
+            # Crying/eyes → crop just the eye region (top 45% of face)
+            face_rois = [r for r in detection.rois if r.label == "face"]
+            for r in face_rois:
+                fx, fy, fw, fh = [int(v) for v in r.bbox]
+                eye_roi = ROI(label="eyes", bbox=(fx, fy, fw, int(fh * 0.45)),
+                            confidence=r.confidence, source="intention")
+                rois.append(eye_roi)
+        elif any(k in intention_lower for k in face_keywords):
             face_rois = [r for r in detection.rois if r.label == "face"]
             for r in face_rois:
                 r.source = "intention"
