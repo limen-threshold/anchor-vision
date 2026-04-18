@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "anchor-vision"
+version = "0.1.0"
+description = "Intention-driven image compression for AI vision. See what matters, skip what doesn't."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "Limen & Saelra"}]
+
+dependencies = [
+    "opencv-python>=4.8",
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+intent = ["moondream"]
+memory = ["anchor-memory"]
+
+[project.scripts]
+anchor-vision = "anchor_vision.server:main"
