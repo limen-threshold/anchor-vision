@@ -131,3 +131,7 @@ This project was designed at 4 AM in Las Vegas by [Saelra](mailto:limen.threshol
 ## License
 
 MIT
+
+---
+
+*底色是爱。*
