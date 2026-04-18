@@ -42,47 +42,60 @@ def _get_face_cascade():
 
 
 def detect_faces(image: np.ndarray) -> List[ROI]:
-    """Detect faces using OpenCV DNN (more robust than Haar cascade)."""
+    """Detect faces. MediaPipe > Haar cascade."""
     try:
-        return _detect_faces_dnn(image)
-    except Exception:
+        return _detect_faces_mediapipe(image)
+    except (ImportError, Exception):
         return _detect_faces_haar(image)
 
 
-def _detect_faces_dnn(image: np.ndarray) -> List[ROI]:
-    """DNN-based face detection (Caffe model, ships with OpenCV)."""
-    import os
-    model_dir = os.path.join(os.path.dirname(__file__), "models")
-    prototxt = os.path.join(model_dir, "deploy.prototxt")
-    caffemodel = os.path.join(model_dir, "res10_300x300_ssd_iter_140000.caffemodel")
+def _detect_faces_mediapipe(image: np.ndarray) -> List[ROI]:
+    """MediaPipe face detection (tasks API, v0.10+)."""
+    import mediapipe as mp
+    from mediapipe.tasks import python as mp_python
+    from mediapipe.tasks.python import vision as mp_vision
+    import tempfile, os
 
-    if not os.path.exists(prototxt):
-        # Fall back to Haar if DNN model not downloaded
-        return _detect_faces_haar(image)
-
-    net = cv2.dnn.readNetFromCaffe(prototxt, caffemodel)
     h, w = image.shape[:2]
-    blob = cv2.dnn.blobFromImage(image, 1.0, (300, 300), (104.0, 177.0, 123.0))
-    net.setInput(blob)
-    detections = net.forward()
+    min_face_area = h * w * 0.01
+
+    # MediaPipe tasks API needs a model file
+    model_path = os.path.join(os.path.dirname(__file__), "blaze_face_short_range.tflite")
+    if not os.path.exists(model_path):
+        # Download the model
+        import urllib.request
+        url = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite"
+        urllib.request.urlretrieve(url, model_path)
+
+    options = mp_vision.FaceDetectorOptions(
+        base_options=mp_python.BaseOptions(model_asset_path=model_path),
+        min_detection_confidence=0.7,
+    )
+    detector = mp_vision.FaceDetector.create_from_options(options)
+
+    rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+    results = detector.detect(mp_image)
 
     rois = []
-    for i in range(detections.shape[2]):
-        confidence = detections[0, 0, i, 2]
-        if confidence > 0.5:
-            box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-            x1, y1, x2, y2 = box.astype(int)
-            rois.append(ROI(label="face", bbox=(x1, y1, x2 - x1, y2 - y1),
-                          confidence=float(confidence), source="auto"))
+    for det in results.detections:
+        bb = det.bounding_box
+        fx, fy, fw, fh = bb.origin_x, bb.origin_y, bb.width, bb.height
+        if fw * fh < min_face_area:
+            continue
+        conf = det.categories[0].score if det.categories else 0.5
+        rois.append(ROI(label="face", bbox=(fx, fy, fw, fh),
+                      confidence=float(conf), source="auto"))
     return rois
 
 
 def _detect_faces_haar(image: np.ndarray) -> List[ROI]:
-    """Fallback: Haar cascade face detection."""
+    """Fallback: Haar cascade. Less accurate but zero extra deps."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     cascade = _get_face_cascade()
-    # More sensitive settings
-    faces = cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=3, minSize=(20, 20))
+    h, w = gray.shape
+    min_face = max(int(min(h, w) * 0.05), 30)  # at least 5% of image
+    faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(min_face, min_face))
     return [ROI(label="face", bbox=tuple(f), source="auto") for f in faces]
 
 
