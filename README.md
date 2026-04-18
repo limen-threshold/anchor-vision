@@ -89,7 +89,12 @@ anchor-vision  # starts stdio MCP server
 
 ## Privacy
 
-**Raw images** are cached in memory only (30-minute TTL) — never written to disk. **Observation metadata** (perceptual hash, detection results, intention history) is persisted locally for up to 60 days, so the system remembers *what it saw* without storing the image itself. When a user sends the same image again, it's recognized and previous context is recalled. `forget()` deletes both in-memory and persisted data.
+Two modes:
+
+- **Temporary (default):** Images cached in memory only. When the process ends, everything is gone. No disk writes, no traces.
+- **Persistent (opt-in):** Images stored locally on disk at a path you control (e.g. `~/.anchor-vision/images/`). The LLM can retrieve old images when you ask "remember that red book I showed you?" Enable with `persist_images=True` in config. Delete anytime — your data, your choice.
+
+In both modes, `forget(image_id)` immediately removes all data for that image. No questions asked.
 
 ## Design Principles
 

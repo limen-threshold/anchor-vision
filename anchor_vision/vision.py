@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any, List
 from .detect import detect_all, DetectionResult, ROI
 from .compress import compress_image, diff_images, crop_roi, encode_crop
 
-CACHE_TTL = 1800  # 30 minutes
+# No TTL — images stay in memory as long as the process runs.
 
 
 class AnchorVision:
@@ -59,7 +59,6 @@ class AnchorVision:
 
     def _cache_image(self, image: np.ndarray, detection: DetectionResult) -> str:
         """Cache image and detection results. Returns image_id."""
-        self._evict_expired()
         image_id = self._image_id(image)
         self._cache[image_id] = {
             "image": image,
@@ -70,13 +69,6 @@ class AnchorVision:
         self._previous = image_id
         return image_id
 
-    def _evict_expired(self):
-        """Remove cached images older than CACHE_TTL."""
-        now = time.time()
-        expired = [k for k, v in self._cache.items()
-                   if now - v.get("cached_at", 0) > CACHE_TTL]
-        for k in expired:
-            del self._cache[k]
 
     # ── Public API ──
 
