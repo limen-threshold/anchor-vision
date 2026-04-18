@@ -87,6 +87,10 @@ anchor-vision  # starts stdio MCP server
 | `focus` | Zoom into a specific region of a cached image. |
 | `forget` | Delete a cached image. No questions asked. |
 
+## Privacy
+
+Images are cached **in memory only** during the conversation — never written to disk. When the MCP server process ends or `clear_cache()` is called, all image data is gone. If you enable Anchor Memory integration, visual *embeddings* (not images) may be stored persistently — but `forget()` deletes those too.
+
 ## Design Principles
 
 1. **Never send the original image.** Either crop or ask.
