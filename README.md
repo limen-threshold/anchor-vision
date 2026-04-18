@@ -67,7 +67,7 @@ v.forget(result["image_id"])
 
 ## MCP Server
 
-Anchor Vision runs as an MCP server, compatible with Claude Code, claude.ai, and other MCP clients.
+Anchor Vision runs as an MCP server, compatible with mainstream LLMs and other MCP clients.
 
 ```bash
 anchor-vision  # starts stdio MCP server
