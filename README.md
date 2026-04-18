@@ -89,7 +89,7 @@ anchor-vision  # starts stdio MCP server
 
 ## Privacy
 
-Images are cached **in memory only** during the conversation — never written to disk. When the MCP server process ends or `clear_cache()` is called, all image data is gone. If you enable Anchor Memory integration, visual *embeddings* (not images) may be stored persistently — but `forget()` deletes those too.
+Images are cached **in memory only** — never written to disk. Cached images expire automatically after 30 minutes, or when `forget(image_id)` / `clear_cache()` is called. When the MCP server process ends, all image data is gone. If you enable Anchor Memory integration, visual *embeddings* (not raw images) may be stored persistently — but `forget()` deletes those too.
 
 ## Design Principles
 
