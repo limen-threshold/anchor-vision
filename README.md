@@ -89,7 +89,7 @@ anchor-vision  # starts stdio MCP server
 
 ## Privacy
 
-Images are cached **in memory only** — never written to disk. Cached images expire automatically after 30 minutes, or when `forget(image_id)` / `clear_cache()` is called. When the MCP server process ends, all image data is gone. If you enable Anchor Memory integration, visual *embeddings* (not raw images) may be stored persistently — but `forget()` deletes those too.
+**Raw images** are cached in memory only (30-minute TTL) — never written to disk. **Observation metadata** (perceptual hash, detection results, intention history) is persisted locally for up to 60 days, so the system remembers *what it saw* without storing the image itself. When a user sends the same image again, it's recognized and previous context is recalled. `forget()` deletes both in-memory and persisted data.
 
 ## Design Principles
 
