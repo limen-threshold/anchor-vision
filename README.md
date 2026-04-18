@@ -57,6 +57,11 @@ overview = v.glance("photo.jpg")
 detail = v.focus(overview["image_id"], region="face")
 # → {crops: [{label: "face", image_b64: "..."}]}
 
+# Multi-turn: image is cached, follow-up calls don't re-upload
+# LLM asks user "what should I look at?" → user says "the earrings"
+detail2 = v.see(image_id=overview["image_id"], intention="earrings")
+# → same image, new intention, only crops the earrings
+
 # Similar images? Only send what changed.
 result2 = v.see("photo_2.jpg")
 # → {text: "Minor changes (8% of image)", crops: [{label: "changed_region", ...}]}
