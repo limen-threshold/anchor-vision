@@ -113,14 +113,28 @@ pip install anchor-vision[intent]   # + Moondream for intention parsing
 pip install anchor-vision[memory]   # + Anchor Memory integration
 ```
 
-**With Anchor Memory:** Vision queries Memory to check if it's seen something before. Familiar objects get compressed; unfamiliar ones stay sharp. The system learns what you look like over time — so it only sends what's *new* or *different* today.
+**With Anchor Memory (v1.3+):** Vision queries Memory to check if it's seen something before. Familiar objects get compressed; unfamiliar ones stay sharp. The system learns what you look like over time — so it only sends what's *new* or *different* today.
+
+After viewing an image, call Memory's `consolidate()` to passively update Hebbian connections — even if the AI didn't explicitly search for the memory, the visual observation still strengthens relevant connections in the graph.
+
+```python
+# After Vision processes an image:
+vision_result = vision.see("photo.jpg", intention="check her mood")
+# → {text: "1 face, eyes look red", crops: [...]}
+
+# Consolidate visual observation into Memory's Hebbian graph:
+memory.consolidate("saw her face, eyes looked red, possible crying")
+# → Connects "crying" memories with "her face" memories, zero LLM tokens
+```
 
 ## Part of the Anchor Ecosystem
 
 | Project | Purpose |
 |---------|---------|
-| [Anchor Memory](https://github.com/limen-threshold/anchor-memory) | Graph-structured memory with Hebbian learning. What stays. |
+| [Anchor Memory](https://github.com/limen-threshold/anchor-memory) | Graph-structured memory with Hebbian learning + passive consolidation. What stays. |
 | **Anchor Vision** | Intention-driven visual perception. How to see. |
+
+Memory v1.3.2 added `consolidate()` — passive Hebbian updates from conversation text, zero LLM tokens. Vision observations feed into Memory through this channel.
 
 Memory remembers. Vision observes. Together: see → remember → see smarter → remember more.
 
