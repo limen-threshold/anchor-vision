@@ -24,11 +24,19 @@ class AnchorVision:
     6. User says "forget this" → it's forgotten. No questions.
     """
 
-    def __init__(self, cache_dir: Optional[str] = None):
+    def __init__(self, cache_dir: Optional[str] = None, memory=None):
         self._cache: Dict[str, Dict] = {}  # image_id -> {image, detection, phash}
         self._previous: Optional[str] = None  # last image_id
         self._cache_dir = cache_dir or "/tmp/anchor_vision_cache"
         os.makedirs(self._cache_dir, exist_ok=True)
+
+        # Visual memory: use Anchor Memory if available, else built-in lite
+        self._memory = memory  # Anchor Memory instance (optional)
+        if self._memory is None:
+            from .memory_lite import VisualMemoryLite
+            self._visual_memory = VisualMemoryLite()
+        else:
+            self._visual_memory = None
 
     def _image_id(self, image: np.ndarray) -> str:
         """Generate a stable ID for an image."""
@@ -156,6 +164,10 @@ class AnchorVision:
         )
         result = compress_image(image, deduped_detection)
         result["image_id"] = image_id
+
+        # Store observation in visual memory
+        self._store_observation(image_id, result.get("text", ""), intention)
+
         return result
 
     def glance(self, image_path: str) -> Dict[str, Any]:
@@ -239,6 +251,32 @@ class AnchorVision:
         self._previous = None
 
     # ── Internal ──
+
+    def _store_observation(self, image_id: str, description: str, intention: str = ""):
+        """Store visual observation — in Memory if available, else lite."""
+        phash = self._cache.get(image_id, {}).get("phash", "")
+        if self._memory:
+            # Use full Anchor Memory
+            try:
+                self._memory.consolidate(description)
+            except Exception:
+                pass
+        elif self._visual_memory:
+            # Use built-in lite memory
+            detections = []
+            cached = self._cache.get(image_id, {})
+            if "detection" in cached:
+                detections = [r.label for r in cached["detection"].rois]
+            self._visual_memory.store(phash, description, detections, intention or "")
+
+    def has_seen(self, image_path: str) -> Optional[Dict]:
+        """Check if we've seen this or a similar image before."""
+        image = self._load_image(image_path)
+        phash = self._phash(image)
+
+        if self._visual_memory:
+            return self._visual_memory.find_by_phash(phash, threshold=0.85)
+        return None
 
     def _handle_similar(
         self, current: np.ndarray, previous: np.ndarray,
