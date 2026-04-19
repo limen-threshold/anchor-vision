@@ -4,7 +4,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "anchor-vision"
-version = "0.1.0"
+version = "0.2.0"
 description = "Intention-driven image compression for AI vision. See what matters, skip what doesn't."
 readme = "README.md"
 requires-python = ">=3.9"
