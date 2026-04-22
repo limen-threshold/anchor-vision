@@ -42,11 +42,53 @@ def _get_face_cascade():
 
 
 def detect_faces(image: np.ndarray) -> List[ROI]:
-    """Detect faces. MediaPipe > Haar cascade."""
+    """Detect faces. Try all 4 rotations if needed. MediaPipe > Haar cascade."""
     try:
-        return _detect_faces_mediapipe(image)
-    except (ImportError, Exception):
-        return _detect_faces_haar(image)
+        detector = _detect_faces_mediapipe
+    except Exception:
+        detector = _detect_faces_haar
+
+    # Try original orientation first
+    rois = detector(image)
+    if rois:
+        return rois
+
+    # Try 90°, 180°, 270° rotations — map ROIs back to original coords
+    h, w = image.shape[:2]
+    rotations = [
+        (cv2.ROTATE_90_CLOCKWISE, 90),
+        (cv2.ROTATE_180, 180),
+        (cv2.ROTATE_90_COUNTERCLOCKWISE, 270),
+    ]
+    for rot_code, angle in rotations:
+        rotated = cv2.rotate(image, rot_code)
+        rois = detector(rotated)
+        if rois:
+            return [_unrotate_roi(r, angle, h, w) for r in rois]
+
+    return []
+
+
+def _unrotate_roi(roi: ROI, angle: int, orig_h: int, orig_w: int) -> ROI:
+    """Map ROI coordinates from rotated image back to original orientation."""
+    x, y, rw, rh = [int(v) for v in roi.bbox]
+    if angle == 90:
+        # rotated image is (orig_w, orig_h). x,y in rotated -> original
+        new_x = y
+        new_y = orig_w - x - rw
+        new_w, new_h = rh, rw
+    elif angle == 180:
+        new_x = orig_w - x - rw
+        new_y = orig_h - y - rh
+        new_w, new_h = rw, rh
+    elif angle == 270:
+        new_x = orig_h - y - rh
+        new_y = x
+        new_w, new_h = rh, rw
+    else:
+        return roi
+    return ROI(label=roi.label, bbox=(new_x, new_y, new_w, new_h),
+               confidence=roi.confidence, source=roi.source)
 
 
 def _detect_faces_mediapipe(image: np.ndarray) -> List[ROI]:
